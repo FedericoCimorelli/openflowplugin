@@ -137,6 +137,9 @@ public class RoleService extends AbstractSimpleService<RoleRequestInputBuilder, 
             case NOCHANGE:
                 ofJavaRole = ControllerRole.OFPCRROLENOCHANGE;
                 break;
+            case BECOMEEQUAL:
+                ofJavaRole = ControllerRole.OFPCRROLEEQUAL;
+                break;
             default:
                 // no intention
                 LOG.warn("given role is not supported by protocol roles: {}", role);

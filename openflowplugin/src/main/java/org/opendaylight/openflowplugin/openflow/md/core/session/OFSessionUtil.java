@@ -22,6 +22,7 @@ import org.opendaylight.openflowplugin.api.openflow.md.core.SwitchConnectionDist
 import org.opendaylight.openflowplugin.api.openflow.md.core.TranslatorKey;
 import org.opendaylight.openflowplugin.extension.api.core.extension.ExtensionConverterProvider;
 import org.opendaylight.openflowplugin.api.openflow.md.queue.PopListener;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.common.types.rev130731.ControllerRole;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.protocol.rev130731.GetFeaturesOutput;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.protocol.rev130731.OfHeader;
 import org.opendaylight.yangtools.yang.binding.DataObject;
@@ -103,6 +104,13 @@ public abstract class OFSessionUtil {
 	return(resulContext);
     }
 
+
+    public static void setRole(SessionContext sessionContext, ControllerRole controllerRole){
+            LOG.info("setRole(SessionContext sessionContext, ControllerRole controllerRole) with:"+controllerRole.toString());
+            getSessionManager().setRole(sessionContext, controllerRole);
+        }
+
+
     public static void setRole(SessionContext sessionContext)
     {
             getSessionManager().setRole(sessionContext);
@@ -160,14 +168,14 @@ public abstract class OFSessionUtil {
     public static ConjunctSessionManager getSessionManager() {
         return SessionManagerOFImpl.getInstance();
     }
-    
+
     /**
      * release session manager singleton instance
      */
     public static void releaseSessionManager() {
         SessionManagerOFImpl.releaseInstance();
     }
-    
+
     /**
     * @return session manager listener Map
     */

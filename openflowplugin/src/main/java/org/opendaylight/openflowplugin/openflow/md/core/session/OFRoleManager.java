@@ -15,6 +15,9 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import java.math.BigInteger;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
@@ -24,6 +27,7 @@ import org.opendaylight.openflowplugin.api.openflow.md.core.session.SessionConte
 import org.opendaylight.openflowplugin.api.openflow.md.core.session.SessionManager;
 import org.opendaylight.openflowplugin.openflow.md.core.ThreadPoolLoggingExecutor;
 import org.opendaylight.openflowplugin.openflow.md.util.RoleUtil;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.common.types.rev130731.ControllerRole;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.openflow.common.config.impl.rev140326.OfpRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,6 +105,57 @@ public class OFRoleManager implements AutoCloseable {
             }
         }
     }
+
+
+    public void manageRoleChange(final OfpRole role, List<String> datapathIds) {
+        LOG.info("manageRoleChange with role:"+role.toString());
+        for (final SessionContext session : sessionManager.getAllSessions()) {
+            if(datapathIds.contains(session.getFeatures().getDatapathId().toString())){
+//                try {
+//                        workQueue.put(new RolePushTask(role, session));
+//                } catch (InterruptedException e) {
+//                        LOG.warn("Processing of role request failed while enqueueing role task: {}", e.getMessage());
+//                }
+                if(role.equals(OfpRole.BECOMESLAVE))
+                    OFSessionUtil.setRole(session, ControllerRole.OFPCRROLESLAVE);
+                if(role.equals(OfpRole.BECOMEMASTER))
+                    OFSessionUtil.setRole(session, ControllerRole.OFPCRROLEMASTER);
+                if(role.equals(OfpRole.BECOMEEQUAL))
+                    OFSessionUtil.setRole(session, ControllerRole.OFPCRROLEEQUAL);
+
+            }
+        }
+
+        while (!workQueue.isEmpty()) {
+            RolePushTask task = workQueue.poll();
+            ListenableFuture<Boolean> rolePushResult = broadcastPool.submit(task);
+            CheckedFuture<Boolean, RolePushException> rolePushResultChecked =
+                    RoleUtil.makeCheckedRuleRequestFxResult(rolePushResult);
+            try {
+                Boolean succeeded = rolePushResultChecked.checkedGet(TIMEOUT, TIMEOUT_UNIT);
+                if (!MoreObjects.firstNonNull(succeeded, Boolean.FALSE)) {
+                    if (task.getRetryCounter() < RETRY_LIMIT) {
+                        workQueue.offer(task);
+                    }
+                }
+            } catch (RolePushException | TimeoutException e) {
+                LOG.warn("failed to process role request: {}", e);
+            }
+        }
+    }
+
+
+    public Map<String, String> getSwitchesRoles(){
+        Map<String, String> swsRoles = new HashMap<String, String>();
+        for (final SessionContext session : sessionManager.getAllSessions()) {
+            ControllerRole controllerRole = RoleUtil.readRoleFromDevice(session);
+            swsRoles.put(
+                    session.getFeatures().getDatapathId().toString(),
+                    controllerRole.getIntValue()+":"+controllerRole.name());
+        }
+        return swsRoles;
+    }
+
 
     @Override
     public void close() throws Exception {

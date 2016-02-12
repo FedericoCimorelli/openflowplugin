@@ -27,6 +27,7 @@ import org.opendaylight.openflowplugin.api.openflow.md.core.session.SwitchSessio
 import org.opendaylight.openflowplugin.api.openflow.md.queue.PopListener;
 import org.opendaylight.openflowplugin.api.openflow.statistics.MessageSpy;
 import org.opendaylight.openflowplugin.extension.api.core.extension.ExtensionConverterProvider;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.common.types.rev130731.ControllerRole;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.protocol.rev130731.OfHeader;
 import org.opendaylight.yangtools.concepts.ListenerRegistration;
 import org.opendaylight.yangtools.util.ListenerRegistry;
@@ -230,6 +231,17 @@ public class SessionManagerOFImpl implements ConjunctSessionManager {
                 }
             }
         }
+
+        @Override
+        public void setRole(SessionContext context, ControllerRole controllerRole) {
+            for (ListenerRegistration<SessionListener> listener : sessionListeners) {
+                try {
+                    listener.getInstance().setRole(context);
+                } catch (Exception e) {
+                    LOG.error("Unhandled exeption occured while invoking setRole on listener", e);
+                }
+            }
+        }
     };
     private MessageSpy<DataContainer> messageSpy;
     private ExtensionConverterProvider extensionConverterProvider;
@@ -334,5 +346,18 @@ public class SessionManagerOFImpl implements ConjunctSessionManager {
     @Override
     public Collection<SessionContext> getAllSessions() {
         return sessionLot.values();
+    }
+
+    @Override
+    public void setRole(SessionContext context, ControllerRole controllerRole) {
+        LOG.info("setRole(SessionContext context, ControllerRole controllerRole) with:"+controllerRole.toString());
+        for (ListenerRegistration<SessionListener> listener : sessionListeners) {
+            try {
+                listener.getInstance().setRole(context, controllerRole);
+            } catch (Exception e) {
+                LOG.error("Unhandled exeption occured while invoking setRole on listener", e);
+            }
+        }
+        //sessionNotifier.setRole(context, controllerRole);
     }
 }

@@ -37,6 +37,7 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeUpd
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.NodeKey;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.common.types.rev130731.ControllerRole;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.protocol.rev130731.GetFeaturesOutput;
 import org.opendaylight.yangtools.concepts.CompositeObjectRegistration;
 import org.opendaylight.yangtools.concepts.ListenerRegistration;
@@ -230,6 +231,12 @@ public class SalRegistrationManager implements SessionListener, AutoCloseable {
 
     private void unregOpenflowEntityOwnership(NodeId nodeId) {
         entManager.unregisterEntityOwnershipRequest(nodeId);
+    }
+
+    @Override
+    public void setRole(SessionContext context, ControllerRole controllerRole) {
+        LOG.info("Called SalRegistrationManager setRole with:"+controllerRole.toString());
+        entManager.callOnDeviceOwnershipChanged(context, controllerRole);
     }
 
 }

@@ -19,6 +19,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import org.opendaylight.openflowplugin.api.openflow.md.core.session.SessionContext;
 import org.opendaylight.openflowplugin.openflow.md.core.session.OFRoleManager;
+import org.opendaylight.openflowplugin.openflow.md.core.session.OFSessionUtil;
 import org.opendaylight.openflowplugin.openflow.md.core.session.RolePushException;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.common.types.rev130731.ControllerRole;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.protocol.rev130731.RoleRequestInputBuilder;
@@ -28,6 +29,8 @@ import org.opendaylight.yangtools.yang.common.RpcResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
 /**
  *
@@ -69,6 +72,9 @@ public final class RoleUtil {
                 break;
             case BECOMESLAVE:
                 ofJavaRole = ControllerRole.OFPCRROLESLAVE;
+                break;
+            case BECOMEEQUAL:
+                ofJavaRole = ControllerRole.OFPCRROLEEQUAL;
                 break;
             case NOCHANGE:
                 ofJavaRole = ControllerRole.OFPCRROLENOCHANGE;
@@ -160,4 +166,58 @@ public final class RoleUtil {
                 rolePushResult, exceptionFunction
         );
     }
+
+
+
+    public static void fireRoleChange(int role, List<String> datapathIds) {
+        LOG.info("Starting fire role change...");
+        try (OFRoleManager roleManager = new OFRoleManager(OFSessionUtil.getSessionManager())) {
+            roleManager.manageRoleChange(OfpRole.forValue(role), datapathIds);
+        }
+        catch (Exception e) {
+            LOG.error("Failed to close role manager after sending role change request", e);
+        }
+    }
+
+
+    public static Map<String, String> getSwitchesRoles(){
+        //
+        //TODO check OpenFlow 1.3> protocol version
+        //
+        //
+        Map<String, String> swsRoles = null;
+        try (OFRoleManager roleManager = new OFRoleManager(OFSessionUtil.getSessionManager())) {
+            swsRoles = roleManager.getSwitchesRoles();
+        }
+        catch (Exception e) {
+            LOG.error("Failed to close role manager after sending role change request", e);
+        }
+        if(swsRoles == null){
+            LOG.error("Failed while getting the switches' roles");
+        }
+        return swsRoles;
+    }
+
+
+
+    public static ControllerRole readRoleFromDevice(SessionContext sessionContext) {
+        Future<ControllerRole> roleFuture = null;
+        Future<RpcResult<RoleRequestOutput>> roleReply = sendRoleChangeRequest(sessionContext, OfpRole.NOCHANGE, BigInteger.ZERO);
+        roleFuture = Futures.transform(
+                JdkFutureAdapters.listenInPoolThread(roleReply),
+                new Function<RpcResult<RoleRequestOutput>, ControllerRole>() {
+                    @Override
+                    public ControllerRole apply(RpcResult<RoleRequestOutput> input) {
+                        return input.getResult().getRole();
+                    }
+                });
+        ControllerRole role = null;
+        try{
+            role = roleFuture.get();
+        }catch(ExecutionException | InterruptedException e){
+            LOG.error(e.getMessage());
+        }
+        return role;
+    }
+
 }

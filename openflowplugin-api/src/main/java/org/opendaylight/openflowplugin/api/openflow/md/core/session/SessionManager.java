@@ -21,6 +21,7 @@ import org.opendaylight.openflowplugin.api.openflow.md.core.SwitchConnectionDist
 import org.opendaylight.openflowplugin.api.openflow.statistics.MessageSpy;
 import org.opendaylight.openflowplugin.api.openflow.md.core.TranslatorKey;
 import org.opendaylight.openflowplugin.api.openflow.md.queue.PopListener;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.common.types.rev130731.ControllerRole;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.protocol.rev130731.OfHeader;
 import org.opendaylight.yangtools.concepts.ListenerRegistration;
 import org.opendaylight.yangtools.yang.binding.DataContainer;
@@ -139,4 +140,6 @@ public interface SessionManager extends AutoCloseable {
      * @return collection of current sessions
      */
     Collection<SessionContext> getAllSessions();
+
+    void setRole(SessionContext context, ControllerRole controllerRole);
 }

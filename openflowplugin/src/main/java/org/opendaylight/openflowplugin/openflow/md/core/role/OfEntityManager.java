@@ -27,6 +27,7 @@ import org.opendaylight.openflowplugin.api.openflow.md.core.NotificationQueueWra
 import org.opendaylight.yangtools.concepts.CompositeObjectRegistration;
 import org.opendaylight.yangtools.yang.common.QName;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeId;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.common.types.rev130731.ControllerRole;
 import org.opendaylight.openflowplugin.api.openflow.md.core.session.SessionContext;
 import org.opendaylight.controller.md.sal.common.api.clustering.EntityOwnershipChange;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.openflow.common.config.impl.rev140326.OfpRole;
@@ -199,6 +200,84 @@ public class OfEntityManager implements TransactionChainListener{
         }
     }
 
+
+
+    private void onDeviceOwnershipChangedToBecomeEqual(final EntityOwnershipChange ownershipChange) {
+        OfpRole newRole =  OfpRole.BECOMEEQUAL;
+        final Entity entity = ownershipChange.getEntity();
+        SessionContext sessionContext = entsession.get(entity)!=null?entsession.get(entity).getContext():null;
+        if (ownershipChange.isOwner()) {
+            LOG.info("onDeviceOwnershipChanged: Set controller as a EQUAL controller because " +
+                    "it's the OWNER of the {}", entity);
+            newRole =  OfpRole.BECOMEEQUAL;
+        }
+        if (sessionContext != null) {
+            //Register the RPC, given *this* controller instance is going to be master owner.
+            //If role registration fails for this node, it will deregister as a candidate for
+            //ownership and that will make this controller non-owner and it will deregister the
+            // router rpc.
+            setDeviceOwnershipState(entity,newRole==OfpRole.BECOMEEQUAL);
+            registerRoutedRPCForSwitch(entsession.get(entity));
+
+            final String targetSwitchDPId = sessionContext.getFeatures().getDatapathId().toString();
+            RolePushTask task = new RolePushTask(newRole, sessionContext);
+            ListenableFuture<Boolean> rolePushResult = pool.submit(task);
+            final CheckedFuture<Boolean, RolePushException> rolePushResultChecked =
+                RoleUtil.makeCheckedRuleRequestFxResult(rolePushResult);
+            Futures.addCallback(rolePushResult, new FutureCallback<Boolean>(){
+                @Override
+                public void onSuccess(Boolean result){
+                    LOG.info("onDeviceOwnershipChanged: Controller is successfully set as a " +
+                            "EQUAL controller for {}", targetSwitchDPId);
+                    entsession.get(entity).getOfSwitch().sendEmptyTableFeatureRequest();
+                    sendNodeAddedNotification(entsession.get(entity));
+                }
+                @Override
+                public void onFailure(Throwable e) {
+                    LOG.warn("onDeviceOwnershipChanged: Controller is not able to set the "+ "EQUAL role for {}.",
+                            targetSwitchDPId, e);
+                    LOG.info("onDeviceOwnershipChanged: ..and this *instance* is owner of the device {}. "
+                                    + "Closing the registration, so other entity can become owner "
+                                    + "and attempt to be master controller.",  targetSwitchDPId);
+                    EntityOwnershipCandidateRegistration ownershipRegistrent = entRegistrationMap.get(entity);
+                    if (ownershipRegistrent != null) {
+                        setDeviceOwnershipState(entity, false);
+                        ownershipRegistrent.close();
+                        MDSwitchMetaData switchMetadata = entsession.get(entity);
+                        if (switchMetadata != null) {
+                            switchMetadata.setIsOwnershipInitialized(false);
+                            // We can probably leave deregistration till the
+                            // node ownerhsip change.
+                            // But that can probably cause some race condition.
+                            deregisterRoutedRPCForSwitch(switchMetadata);
+                        }
+                    }
+                    LOG.info("onDeviceOwnershipChanged: ..and registering it back to participate in "
+                                    + "ownership and re-try");
+                    EntityOwnershipCandidateRegistration entityRegistration;
+                    try {
+                        entityRegistration = entityOwnershipService.registerCandidate(entity);
+                        entRegistrationMap.put(entity, entityRegistration);
+                        LOG.info("onDeviceOwnershipChanged: re-registered candidate for "
+                                        + "ownership of the {}", targetSwitchDPId);
+                    } catch (CandidateAlreadyRegisteredException ex) {
+                        // we can log and move for this error, as listener is
+                        // present and role changes will be served.
+                        LOG.error("onDeviceOwnershipChanged: *Surprisingly* Entity is already "
+                                        + "registered with EntityOwnershipService : {}", targetSwitchDPId, ex);
+                    }
+                }
+            });
+        } else {
+            LOG.warn("onDeviceOwnershipChanged: sessionContext is not available. Releasing ownership of the device");
+            EntityOwnershipCandidateRegistration ownershipRegistrant = entRegistrationMap.get(entity);
+            if (ownershipRegistrant != null) {
+                ownershipRegistrant.close();
+            }
+        }
+    }
+
+
     public void onDeviceOwnershipChanged(final EntityOwnershipChange ownershipChange) {
         final OfpRole newRole;
         final Entity entity = ownershipChange.getEntity();
@@ -221,6 +300,10 @@ public class OfEntityManager implements TransactionChainListener{
                     // You don't have to explicitly set role to Slave in this case,
                     // because other controller will be taking over the master role
                     // and that will force other controller to become slave.
+
+                    //Added in order to properly handle set role to SLAVE when called from role manager
+                    setSlaveRole(sessionContext);
+                    sendNodeAddedNotification(entsession.get(entity));
                 } else {
                     boolean isOwnershipInitialized = entsession.get(entity).getIsOwnershipInitialized();
                     setDeviceOwnershipState(entity,false);
@@ -380,6 +463,40 @@ public class OfEntityManager implements TransactionChainListener{
         entityMetadata.setIsOwnershipInitialized(true);
         entityMetadata.getOfSwitch().setEntityOwnership(isMaster);
     }
+
+
+    public void callOnDeviceOwnershipChanged(SessionContext context, ControllerRole controllerRole){
+        LOG.info("callOnDeviceOwnershipChanged(SessionContext context, ControllerRole controllerRole)");
+        for(Entity entity : entsession.keySet()){
+            if(entsession.get(entity).getContext().getFeatures().getDatapathId().toString()
+                    .equals(context.getFeatures().getDatapathId().toString())){
+                //new EntityOwnershipChange(entity, wasOwner, isOwner, hasOwner)
+                if(controllerRole.equals(ControllerRole.OFPCRROLEMASTER)){
+                    EntityOwnershipChange entityOwnershipChange = new EntityOwnershipChange(entity, false, true, true);
+                    LOG.info("onDeviceOwnershipChanged(entityOwnershipChange): "+entityOwnershipChange.toString());
+                    onDeviceOwnershipChanged(entityOwnershipChange);
+                }
+                if(controllerRole.equals(ControllerRole.OFPCRROLEEQUAL)){
+                    EntityOwnershipChange entityOwnershipChange = new EntityOwnershipChange(entity, false, true, true);
+                    LOG.info("onDeviceOwnershipChanged(entityOwnershipChange): "+entityOwnershipChange.toString());
+                    onDeviceOwnershipChangedToBecomeEqual(entityOwnershipChange);
+                }
+                if(controllerRole.equals(ControllerRole.OFPCRROLESLAVE)){
+                    EntityOwnershipChange entityOwnershipChange = new EntityOwnershipChange(entity, true, false, true);
+                    LOG.info("onDeviceOwnershipChanged(entityOwnershipChange): "+entityOwnershipChange.toString());
+                    onDeviceOwnershipChanged(entityOwnershipChange);
+                }
+            }
+        }
+    }
+
+
+    public static NodeId nodeIdFromDatapathId(final BigInteger datapathId) {
+        // FIXME: Convert to textual representation of datapathID
+        String current = String.valueOf(datapathId);
+        return new NodeId("openflow:" + current);
+        }
+
 
     private class MDSwitchMetaData {
 
