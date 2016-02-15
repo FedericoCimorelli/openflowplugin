@@ -603,6 +603,9 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
             InstanceIdentifier<NodeOFStatistics> NODEOFSTATS_IID = InstanceIdentifier.builder(NodeOFStatistics.class).build();
             List<String> l = new ArrayList<String>();
             l.add("0");
+            
+            Node
+            
             NodeOFStatistics o;
             o.get
             NodeOFStatistics nodeOFStatistics = new NodeOFStatisticsBuilder()
