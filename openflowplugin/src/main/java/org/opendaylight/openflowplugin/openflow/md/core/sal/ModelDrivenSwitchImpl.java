@@ -8,12 +8,20 @@
 package org.opendaylight.openflowplugin.openflow.md.core.sal;
 
 import com.google.common.base.Optional;
-import org.opendaylight.controller.md.sal.binding.api.ReadWriteTransaction;
-
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import org.opendaylight.controller.md.sal.binding.api.DataBroker;
+import org.opendaylight.controller.md.sal.binding.api.ReadOnlyTransaction;
+import org.opendaylight.controller.md.sal.binding.api.ReadWriteTransaction;
+import org.opendaylight.controller.md.sal.binding.api.WriteTransaction;
+import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
+
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.opendaylight.controller.sal.binding.api.NotificationProviderService;
@@ -74,6 +82,8 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.meter.statistics.rev131111.
 import org.opendaylight.yang.gen.v1.urn.opendaylight.meter.statistics.rev131111.GetMeterStatisticsOutput;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.module.config.rev141015.SetConfigInput;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.module.config.rev141015.SetConfigOutput;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.node.statistics.rev160114.NodeOFStatistics;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.node.statistics.rev160114.NodeOFStatisticsBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.common.types.rev130731.MultipartRequestFlags;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.common.types.rev130731.MultipartType;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.protocol.rev130731.MultipartRequestInputBuilder;
@@ -98,6 +108,7 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.queue.statistics.rev131216.
 import org.opendaylight.yang.gen.v1.urn.opendaylight.queue.statistics.rev131216.GetQueueStatisticsFromGivenPortOutput;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.table.service.rev131026.UpdateTableInput;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.table.service.rev131026.UpdateTableOutput;
+import org.opendaylight.yangtools.yang.binding.DataObject;
 import org.opendaylight.yangtools.yang.binding.InstanceIdentifier;
 import org.opendaylight.yangtools.yang.common.RpcResult;
 import org.slf4j.Logger;
@@ -134,6 +145,7 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         rpcTaskContext.setRpcPool(OFSessionUtil.getSessionManager().getRpcPool());
         rpcTaskContext.setMessageSpy(OFSessionUtil.getSessionManager().getMessageSpy());
 
+        initializeOFStatsPerSwitch();
     }
 
     @Override
@@ -145,7 +157,12 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         OFRpcTask<AddFlowInput, RpcResult<UpdateFlowOutput>> task =
                 OFRpcTaskFactory.createAddFlowTask(rpcTaskContext, input, cookie);
         ListenableFuture<RpcResult<UpdateFlowOutput>> result = task.submit();
-
+        
+		//////////////////////////////////////////////////
+		LOG.info("QWERTY12");
+		LOG.info(input.toString());
+        ////////////////////////////////////////////////
+        incrementSwitchOFMessageCounters();
         return Futures.transform(result, OFRpcFutureResultTransformFactory.createForAddFlowOutput());
     }
 
@@ -160,7 +177,8 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         OFRpcTask<AddGroupInput, RpcResult<UpdateGroupOutput>> task =
                 OFRpcTaskFactory.createAddGroupTask(rpcTaskContext, input, cookie);
         ListenableFuture<RpcResult<UpdateGroupOutput>> result = task.submit();
-
+        ////////////////////////////////////////////////
+        incrementSwitchOFMessageCounters();
         return Futures.transform(result, OFRpcFutureResultTransformFactory.createForAddGroupOutput());
     }
 
@@ -187,7 +205,11 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         OFRpcTask<RemoveFlowInput, RpcResult<UpdateFlowOutput>> task =
                 OFRpcTaskFactory.createRemoveFlowTask(rpcTaskContext, input, cookie);
         ListenableFuture<RpcResult<UpdateFlowOutput>> result = task.submit();
-
+		//////////////////////////////////////////////////
+		LOG.info("QWERTY13");
+		LOG.info(input.toString());
+        ////////////////////////////////////////////////
+        incrementSwitchOFMessageCounters();
         return Futures.transform(result, OFRpcFutureResultTransformFactory.createForRemoveFlowOutput());
     }
 
@@ -211,7 +233,8 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         OFRpcTask<RemoveMeterInput, RpcResult<UpdateMeterOutput>> task =
                 OFRpcTaskFactory.createRemoveMeterTask(rpcTaskContext, input, cookie);
         ListenableFuture<RpcResult<UpdateMeterOutput>> result = task.submit();
-
+        ////////////////////////////////////////////////
+        incrementSwitchOFMessageCounters();
         return Futures.transform(result, OFRpcFutureResultTransformFactory.createForRemoveMeterOutput());
     }
 
@@ -229,6 +252,12 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         }
 
         LOG.debug("Calling the transmitPacket RPC method");
+        
+        //////////////////////////////////////////////////
+        LOG.info("QWERTY10");
+        LOG.info(input.toString());
+        ////////////////////////////////////////////////
+        incrementSwitchOFMessageCounters();
         return messageService.packetOut(message, cookie);
     }
 
@@ -242,7 +271,11 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         OFRpcTask<UpdateFlowInput, RpcResult<UpdateFlowOutput>> task =
                 OFRpcTaskFactory.createUpdateFlowTask(rpcTaskContext, input, cookie, rwTx);
         ListenableFuture<RpcResult<UpdateFlowOutput>> result = task.submit();
-
+		//////////////////////////////////////////////////
+		LOG.info("QWERTY14");
+		LOG.info(input.toString());
+        ////////////////////////////////////////////////
+        incrementSwitchOFMessageCounters();
         return result;
     }
 
@@ -256,7 +289,10 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         OFRpcTask<UpdateGroupInput, RpcResult<UpdateGroupOutput>> task =
                 OFRpcTaskFactory.createUpdateGroupTask(rpcTaskContext, input, cookie);
         ListenableFuture<RpcResult<UpdateGroupOutput>> result = task.submit();
-
+        ///////////////////////////////
+        LOG.info("QWERTY_4");
+        incrementSwitchOFMessageCounters();
+        ///////////////////////////////
         return result;
     }
 
@@ -270,7 +306,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         OFRpcTask<UpdateMeterInput, RpcResult<UpdateMeterOutput>> task =
                 OFRpcTaskFactory.createUpdateMeterTask(rpcTaskContext, input, cookie);
         ListenableFuture<RpcResult<UpdateMeterOutput>> result = task.submit();
-
         return result;
     }
 
@@ -289,7 +324,8 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         OFRpcTask<GetAllGroupStatisticsInput, RpcResult<GetAllGroupStatisticsOutput>> task =
                 OFRpcTaskFactory.createGetAllGroupStatisticsTask(rpcTaskContext, input, cookie);
         ListenableFuture<RpcResult<GetAllGroupStatisticsOutput>> result = task.submit();
-
+        ////////////////////////////////////////////////
+        incrementSwitchOFMessageCounters();
         return result;
 
     }
@@ -318,6 +354,9 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetGroupStatisticsInput, RpcResult<GetGroupStatisticsOutput>> task =
                 OFRpcTaskFactory.createGetGroupStatisticsTask(rpcTaskContext, input, null);
+		///////////////////////////////
+		LOG.info("QWERTY_8");
+		///////////////////////////////
         return task.submit();
     }
 
@@ -446,6 +485,8 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetAggregateFlowStatisticsFromFlowTableForGivenMatchInput, RpcResult<GetAggregateFlowStatisticsFromFlowTableForGivenMatchOutput>> task =
                 OFRpcTaskFactory.createGetAggregateFlowStatisticsFromFlowTableForGivenMatchTask(rpcTaskContext, input, null);
+        ////////////////////////////////////////////////
+        incrementSwitchOFMessageCounters();
         return task.submit();
     }
 
@@ -553,4 +594,69 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         builder.setXid(getSessionContext().getNextXid());
         rpcTaskContext.getSession().getPrimaryConductor().getConnectionAdapter().multipartRequest(builder.build());
     }
+    
+    
+    private void initializeOFStatsPerSwitch() {
+        DataBroker dataBroker = OFSessionUtil.getSessionManager().getDataBroker();
+        try{
+            LOG.info("Initialization for the Node OF counters");
+            InstanceIdentifier<NodeOFStatistics> NODEOFSTATS_IID = InstanceIdentifier.builder(NodeOFStatistics.class).build();
+            List<String> l = new ArrayList<String>();
+            l.add("0");
+            NodeOFStatistics o;
+            o.get
+            NodeOFStatistics nodeOFStatistics = new NodeOFStatisticsBuilder()
+                    .setOFMsgCounter(l)
+                    .build(); 
+            WriteTransaction wtx = dataBroker.newWriteOnlyTransaction();
+            wtx.merge(LogicalDatastoreType.OPERATIONAL, NODEOFSTATS_IID, nodeOFStatistics, true);
+            wtx.submit();
+            LOG.info("Initialization for the Node OF counters success!");           
+        }
+        catch(Exception e){
+            LOG.error(e.getMessage());
+        }
+    }   
+    
+    
+    
+    private void incrementSwitchOFMessageCounters() {
+        final DataBroker dataBroker = OFSessionUtil.getSessionManager().getDataBroker();
+        try{
+            LOG.info("Incrementing OF Node message counter...");
+            final InstanceIdentifier<NodeOFStatistics> NODEOFSTATS_IID = InstanceIdentifier.builder(NodeOFStatistics.class).build();
+            
+            ReadOnlyTransaction readTx = dataBroker.newReadOnlyTransaction();
+            ListenableFuture<Optional<NodeOFStatistics>> dataFuture = readTx.read(LogicalDatastoreType.OPERATIONAL, NODEOFSTATS_IID);
+            Futures.addCallback(dataFuture, new FutureCallback<Optional<NodeOFStatistics>>() {
+                @Override
+                public void onSuccess(final Optional<NodeOFStatistics> result) {
+                    if(result.isPresent()) {
+                    	long count = 0;
+                    	count = new Long(result.get().getOFMsgCounter().get(0));
+                    	LOG.info("Incrementing OF Node message counter, found "+count+", writing "+(count+1));
+                    	List<String> counters = result.get().getOFMsgCounter();
+                    	counters.remove(0);
+                    	count+=1;
+                    	counters.add(count+"");
+                    	NodeOFStatistics nodeOFStatistics = new NodeOFStatisticsBuilder().setOFMsgCounter(counters).build();
+                    	WriteTransaction wtx = dataBroker.newWriteOnlyTransaction();
+                        wtx.merge(LogicalDatastoreType.OPERATIONAL, NODEOFSTATS_IID, nodeOFStatistics, true);
+                        wtx.submit();
+                        LOG.info("Incrementing OF Node message counter, success!");
+                    } else {
+                    	LOG.info("Incrementing OF Node message counter, read not present");
+                    }
+                }
+                @Override
+                public void onFailure(final Throwable t) {
+                	LOG.info("Incrementing OF Node message counter, read from datastore failed");
+                }
+            });
+        }
+        catch(Exception e){
+            LOG.error(e.getMessage());
+        }
+    } 
+
 }
