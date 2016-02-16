@@ -89,6 +89,7 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.nodes.statistics.rev160114.
 import org.opendaylight.yang.gen.v1.urn.opendaylight.nodes.statistics.rev160114.ofstatistics.OfNodeBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.nodes.statistics.rev160114.ofstatistics.ofnode.Counter;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.nodes.statistics.rev160114.ofstatistics.ofnode.CounterBuilder;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.common.types.rev130731.ControllerRole;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.common.types.rev130731.MultipartRequestFlags;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.common.types.rev130731.MultipartType;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.protocol.rev130731.MultipartRequestInputBuilder;
@@ -127,6 +128,7 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
     private final IMessageDispatchService messageService;
     private short version = 0;
     private OFRpcTaskContext rpcTaskContext;
+    private SessionContext sessionContext;
 
     // TODO:read timeout from configSubsystem
     protected long maxTimeout = 1000;
@@ -141,6 +143,7 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
                                     final SessionContext sessionContext) {
         super(identifier, sessionContext);
         this.nodeId = nodeId;
+        this.sessionContext = sessionContext;
         messageService = sessionContext.getMessageDispatchService();
         version = sessionContext.getPrimaryConductor().getVersion();
         final NotificationProviderService rpcNotificationProviderService = OFSessionUtil.getSessionManager().getNotificationProviderService();
@@ -624,48 +627,49 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
 
     private void incrementSwitchOFMessageCounters(final String msgType) {
+        if(sessionContext.getRoleOnDevice().equals(ControllerRole.OFPCRROLEMASTER)){
+        	boolean found = false;
+        	Counter odlCounter = null, newCounter = null;
+    		for(Counter c : ofNodeStats.getCounter()){
+    			if(c.getMsgType().equals(msgType)){
+    				found=true;
+    				odlCounter = c;
+    				if(System.currentTimeMillis()-c.getCounterFirstPacketTs().longValue()>onNodeStatsSlotDuration){
+    					//timeout, update last counter, initialize new count
+    					newCounter = new CounterBuilder()
+    							.setMsgType(c.getMsgType())
+    							.setCounterCount(BigInteger.ONE)
+    							.setCounterFirstPacketTs(BigInteger.valueOf(System.currentTimeMillis()))
+    							.setLastCounterCount(c.getCounterCount())
+    							.setLastCounterFirstPacketTs(c.getCounterFirstPacketTs())
+    							.build();
+    				}
+    				else{
+    					//update counter
+    					newCounter = new CounterBuilder()
+    							.setMsgType(c.getMsgType())
+    							.setCounterCount(c.getCounterCount().add(BigInteger.ONE))
+    							.setCounterFirstPacketTs(c.getCounterFirstPacketTs())
+    							.build();
+    				}
+    			}
+    		}
+    		if(!found){
+    			newCounter = new CounterBuilder()
+    					.setMsgType(msgType)
+    					.setCounterCount(BigInteger.ONE)
+    					.setCounterFirstPacketTs(BigInteger.valueOf(System.currentTimeMillis()))
+    					.build();
+    		}
+    		ofNodeStats.getCounter().remove(odlCounter);
+    		ofNodeStats.getCounter().add(newCounter);
 
-    	boolean found = false;
-    	Counter odlCounter = null, newCounter = null;
-		for(Counter c : ofNodeStats.getCounter()){
-			if(c.getMsgType().equals(msgType)){
-				found=true;
-				odlCounter = c;
-				if(System.currentTimeMillis()-c.getCounterFirstPacketTs().longValue()>onNodeStatsSlotDuration){
-					//timeout, update last counter, initialize new count
-					newCounter = new CounterBuilder()
-							.setMsgType(c.getMsgType())
-							.setCounterCount(BigInteger.ONE)
-							.setCounterFirstPacketTs(BigInteger.valueOf(System.currentTimeMillis()))
-							.setLastCounterCount(c.getCounterCount())
-							.setLastCounterFirstPacketTs(c.getCounterFirstPacketTs())
-							.build();
-				}
-				else{
-					//update counter
-					newCounter = new CounterBuilder()
-							.setMsgType(c.getMsgType())
-							.setCounterCount(c.getCounterCount().add(BigInteger.ONE))
-							.setCounterFirstPacketTs(c.getCounterFirstPacketTs())
-							.build();
-				}
-			}
-		}
-		if(!found){
-			newCounter = new CounterBuilder()
-					.setMsgType(msgType)
-					.setCounterCount(BigInteger.ONE)
-					.setCounterFirstPacketTs(BigInteger.valueOf(System.currentTimeMillis()))
-					.build();
-		}
-		ofNodeStats.getCounter().remove(odlCounter);
-		ofNodeStats.getCounter().add(newCounter);
-
-		long offset = System.currentTimeMillis()-lastWriteInDatastoreTimestamp;
-		if(offset > onNodeStatsWriteInDatastoreTimeout){
-			lastWriteInDatastoreTimestamp = System.currentTimeMillis();
-			writeOFStatsUpdateInDataStore();
-		}
+    		long offset = System.currentTimeMillis()-lastWriteInDatastoreTimestamp;
+    		if(offset > onNodeStatsWriteInDatastoreTimeout){
+    			lastWriteInDatastoreTimestamp = System.currentTimeMillis();
+    			writeOFStatsUpdateInDataStore();
+    		    }
+        }
     }
 
 
