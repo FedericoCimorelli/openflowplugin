@@ -131,7 +131,7 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
     // TODO:read timeout from configSubsystem
     protected long maxTimeout = 1000;
     protected TimeUnit maxTimeoutUnit = TimeUnit.MILLISECONDS;
-    
+
     protected long onNodeStatsSlotDuration = 2*60*1000L;
     protected long onNodeStatsWriteInDatastoreTimeout = 3*60*1000L;
     protected long lastWriteInDatastoreTimestamp = 0L;
@@ -153,8 +153,8 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         rpcTaskContext.setMaxTimeoutUnit(maxTimeoutUnit);
         rpcTaskContext.setRpcPool(OFSessionUtil.getSessionManager().getRpcPool());
         rpcTaskContext.setMessageSpy(OFSessionUtil.getSessionManager().getMessageSpy());
-        
-        ofNodeStats = new OfNodeBuilder().setNodeId(nodeId.getValue()).setCounter(new ArrayList<Counter>()).build();
+
+        ofNodeStats = new OfNodeBuilder().setNodeId(nodeId.getValue().split(":")[1]).setCounter(new ArrayList<Counter>()).build();
         lastWriteInDatastoreTimestamp = 0L;
         initializeOFStatsPerSwitch();
     }
@@ -598,42 +598,41 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         builder.setXid(getSessionContext().getNextXid());
         rpcTaskContext.getSession().getPrimaryConductor().getConnectionAdapter().multipartRequest(builder.build());
     }
-    
-    
+
+
     private void initializeOFStatsPerSwitch() {
         DataBroker dataBroker = OFSessionUtil.getSessionManager().getDataBroker();
         try{
             LOG.info("OF Node stats initialization...");
             InstanceIdentifier<OfStatistics> NODEOFSTATS_IID = InstanceIdentifier.builder(OfStatistics.class).build();
-            
+
             List<String> l = new ArrayList<String>();
             l.add("0");
             OfStatistics nodeOFStatistics = new OfStatisticsBuilder()
             		.setOfNode(new ArrayList<OfNode>())
-            		.build(); 
+            		.build();
             WriteTransaction wtx = dataBroker.newWriteOnlyTransaction();
             wtx.merge(LogicalDatastoreType.OPERATIONAL, NODEOFSTATS_IID, nodeOFStatistics, true);
             wtx.submit();
-            LOG.info("OF Node stats initialization success!!");           
+            LOG.info("OF Node stats initialization success!!");
         }
         catch(Exception e){
             LOG.error(e.getMessage());
         }
-    }   
-    
-    
-    
+    }
+
+
+
     private void incrementSwitchOFMessageCounters(final String msgType) {
-    	  	
+
     	boolean found = false;
     	Counter odlCounter = null, newCounter = null;
-    	
 		for(Counter c : ofNodeStats.getCounter()){
 			if(c.getMsgType().equals(msgType)){
 				found=true;
 				odlCounter = c;
 				if(System.currentTimeMillis()-c.getCounterFirstPacketTs().longValue()>onNodeStatsSlotDuration){
-					//timeout, update last counter, initialize new counter
+					//timeout, update last counter, initialize new count
 					newCounter = new CounterBuilder()
 							.setMsgType(c.getMsgType())
 							.setCounterCount(BigInteger.ONE)
@@ -659,25 +658,18 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 					.setCounterFirstPacketTs(BigInteger.valueOf(System.currentTimeMillis()))
 					.build();
 		}
-    	
 		ofNodeStats.getCounter().remove(odlCounter);
 		ofNodeStats.getCounter().add(newCounter);
-		
-		//ONNodesStatisticsManager.ofNodesStatistics.add(ofNodeStats);
-		//LOG.info("QWERTY5: "+ONNodesStatisticsManager.ofNodesStatistics.toString());
-		
-		LOG.info(System.currentTimeMillis()+"");
-		LOG.info((System.currentTimeMillis()-lastWriteInDatastoreTimestamp)+"");
+
 		long offset = System.currentTimeMillis()-lastWriteInDatastoreTimestamp;
-		
 		if(offset > onNodeStatsWriteInDatastoreTimeout){
 			lastWriteInDatastoreTimestamp = System.currentTimeMillis();
 			writeOFStatsUpdateInDataStore();
 		}
     }
 
-    
-    
+
+
 	private void writeOFStatsUpdateInDataStore() {
 		final DataBroker dataBroker = OFSessionUtil.getSessionManager().getDataBroker();
 		try{
@@ -685,13 +677,13 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 		    final InstanceIdentifier<OfStatistics> NODEOFSTATS_IID = InstanceIdentifier.builder(OfStatistics.class).build();
 		    ReadOnlyTransaction readTx = dataBroker.newReadOnlyTransaction();
 		    ListenableFuture<Optional<OfStatistics>> dataFuture = readTx.read(LogicalDatastoreType.OPERATIONAL, NODEOFSTATS_IID);
-		    Futures.addCallback(dataFuture, new FutureCallback<Optional<OfStatistics>>() {          
+		    Futures.addCallback(dataFuture, new FutureCallback<Optional<OfStatistics>>() {
 		    	@Override
 		        public void onSuccess(final Optional<OfStatistics> result) {
 		            if(result.isPresent()) {
 		            	OfStatistics ofs = result.get();
 		            	OfNode ofn = cointains(ofs.getOfNode(), getNodeId());
-		            	if(ofn==null){		
+		            	if(ofn==null){
 		            		LOG.info("DataStore doesn't cointains an entry for node "+getNodeId().getValue()+", creating");
 		            		ofs.getOfNode().add(ofNodeStats);
 		            	}
@@ -699,16 +691,16 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 		            		LOG.info("DataStore already cointains an entry for node "+getNodeId().getValue()+", updating");
 		            		ofs.getOfNode().remove(ofn);
 		            		ofs.getOfNode().add(ofNodeStats);
-		            	}         	
+		            	}
 		            	WriteTransaction wtx = dataBroker.newWriteOnlyTransaction();
 		                wtx.merge(LogicalDatastoreType.OPERATIONAL, NODEOFSTATS_IID, ofs, true);
 		                wtx.submit();
 		                LOG.info("Writing changes to DataStore for node "+getNodeId().getValue());
-		            } 
+		            }
 		            else {
 		            	LOG.info("OF Node stats not properly initialized");
 		            }
-		        }                
+		        }
 				@Override
 		        public void onFailure(final Throwable t) {
 		        	LOG.info("OF Node stats, read from datastore failed");
@@ -718,15 +710,15 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 		catch(Exception e){
 		    LOG.error(e.getMessage());
 		}
-	} 
+	}
 
-    
-    
+
+
     private OfNode cointains(List<OfNode>  ofNodes, NodeId nodeId) {
 		for(OfNode n : ofNodes)
 			if(n.getNodeId().equals(nodeId.getValue()))
 				return n;
-		
+
 		return null;
 	}
 
