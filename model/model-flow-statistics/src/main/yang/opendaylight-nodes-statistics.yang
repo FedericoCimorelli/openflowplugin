@@ -12,18 +12,23 @@ module opendaylight-nodes-statistics {
         description "Initial revision of nodes statistics model";
     }
     
-    grouping NodeOFStatistics{
-        leaf NodeID{
-            type string;
-            }
-        leaf MsgCounter{
-            type uint64;
-            default 0;
+    
+    
+    container ofStatistics{
+        list ofNode{
+            leaf nodeId{
+                type string;
+                }
+            list counter{
+                leaf msgType{
+                    type string;
+                    }
+                leaf msgCount{
+                    type uint64;
+                    default=0;
+                    }
+                }
             }
         }
    
-    container NodesOFStatistics{
-        uses NodeOFStatistics;
-        }
-    
 }
