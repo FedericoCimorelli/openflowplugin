@@ -12,7 +12,24 @@ module opendaylight-nodes-statistics {
         description "Initial revision of nodes statistics model";
     }
     
-    
+    grouping msgCount{
+        leaf lastCounterFirstPacketTs{
+            type uint64;
+            default 0;
+            }
+        leaf lastCounterCount{
+            type uint64;
+            default 0;
+            }
+        leaf counterFirstPacketTs{
+            type uint64;
+            default 0;
+            }
+        leaf counterCount{
+            type uint64;
+            default 0;
+            }
+        }
     
     container ofStatistics{
         list ofNode{
@@ -23,10 +40,7 @@ module opendaylight-nodes-statistics {
                 leaf msgType{
                     type string;
                     }
-                leaf msgCount{
-                    type uint64;
-                    default=0;
-                    }
+                uses msgCount;
                 }
             }
         }
