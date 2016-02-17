@@ -31,6 +31,7 @@ import org.opendaylight.openflowplugin.api.openflow.md.core.session.IMessageDisp
 import org.opendaylight.openflowplugin.openflow.md.core.session.OFSessionUtil;
 import org.opendaylight.openflowplugin.api.openflow.md.core.session.SessionContext;
 import org.opendaylight.openflowplugin.openflow.md.core.session.SwitchConnectionCookieOFImpl;
+import org.opendaylight.openflowplugin.openflow.md.util.RoleUtil;
 import org.opendaylight.openflowplugin.statistics.ONNodesStatisticsManager;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.yang.types.rev100924.Timestamp;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.AddFlowInput;
@@ -134,8 +135,8 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
     protected long maxTimeout = 1000;
     protected TimeUnit maxTimeoutUnit = TimeUnit.MILLISECONDS;
 
-    protected long onNodeStatsSlotDuration = 2*60*1000L;
-    protected long onNodeStatsWriteInDatastoreTimeout = 3*60*1000L;
+    protected long onNodeStatsSlotDuration = 3*60*1000L;
+    protected long onNodeStatsWriteInDatastoreTimeout = 1*60*1000L;
     protected long lastWriteInDatastoreTimestamp = 0L;
     private OfNode ofNodeStats;
 
@@ -172,7 +173,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
                 OFRpcTaskFactory.createAddFlowTask(rpcTaskContext, input, cookie);
         ListenableFuture<RpcResult<UpdateFlowOutput>> result = task.submit();
         //update OF node stitistics
-        incrementSwitchOFMessageCounters("addFlow");
         return Futures.transform(result, OFRpcFutureResultTransformFactory.createForAddFlowOutput());
     }
 
@@ -187,7 +187,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         OFRpcTask<AddGroupInput, RpcResult<UpdateGroupOutput>> task =
                 OFRpcTaskFactory.createAddGroupTask(rpcTaskContext, input, cookie);
         ListenableFuture<RpcResult<UpdateGroupOutput>> result = task.submit();
-        incrementSwitchOFMessageCounters("addGroup");
         return Futures.transform(result, OFRpcFutureResultTransformFactory.createForAddGroupOutput());
     }
 
@@ -201,7 +200,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         OFRpcTask<AddMeterInput, RpcResult<UpdateMeterOutput>> task =
                 OFRpcTaskFactory.createAddMeterTask(rpcTaskContext, input, cookie);
         ListenableFuture<RpcResult<UpdateMeterOutput>> result = task.submit();
-        incrementSwitchOFMessageCounters("addMeter");
         return Futures.transform(result, OFRpcFutureResultTransformFactory.createForAddMeterOutput());
     }
 
@@ -215,7 +213,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
                 OFRpcTaskFactory.createRemoveFlowTask(rpcTaskContext, input, cookie);
         ListenableFuture<RpcResult<UpdateFlowOutput>> result = task.submit();
         //update OF node stitistics
-        incrementSwitchOFMessageCounters("removeFlow");
         return Futures.transform(result, OFRpcFutureResultTransformFactory.createForRemoveFlowOutput());
     }
 
@@ -227,7 +224,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         OFRpcTask<RemoveGroupInput, RpcResult<UpdateGroupOutput>> task =
                 OFRpcTaskFactory.createRemoveGroupTask(rpcTaskContext, input, cookie);
         ListenableFuture<RpcResult<UpdateGroupOutput>> result = task.submit();
-        incrementSwitchOFMessageCounters("removeGroup");
         return Futures.transform(result, OFRpcFutureResultTransformFactory.createForRemoveGroupOutput());
     }
 
@@ -239,7 +235,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         OFRpcTask<RemoveMeterInput, RpcResult<UpdateMeterOutput>> task =
                 OFRpcTaskFactory.createRemoveMeterTask(rpcTaskContext, input, cookie);
         ListenableFuture<RpcResult<UpdateMeterOutput>> result = task.submit();
-        incrementSwitchOFMessageCounters("removeMeter");
         return Futures.transform(result, OFRpcFutureResultTransformFactory.createForRemoveMeterOutput());
     }
 
@@ -255,7 +250,7 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         if (connectionCookie != null && connectionCookie.getValue() != null) {
             cookie = new SwitchConnectionCookieOFImpl(connectionCookie.getValue());
         }
-        incrementSwitchOFMessageCounters("transmitPacket");
+        incrementSwitchOFMessageCounters("transmittedPacket");
         return messageService.packetOut(message, cookie);
     }
 
@@ -269,7 +264,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         OFRpcTask<UpdateFlowInput, RpcResult<UpdateFlowOutput>> task =
                 OFRpcTaskFactory.createUpdateFlowTask(rpcTaskContext, input, cookie, rwTx);
         ListenableFuture<RpcResult<UpdateFlowOutput>> result = task.submit();
-        incrementSwitchOFMessageCounters("updateFlow");
         return result;
     }
 
@@ -283,7 +277,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         OFRpcTask<UpdateGroupInput, RpcResult<UpdateGroupOutput>> task =
                 OFRpcTaskFactory.createUpdateGroupTask(rpcTaskContext, input, cookie);
         ListenableFuture<RpcResult<UpdateGroupOutput>> result = task.submit();
-        incrementSwitchOFMessageCounters("updateGroup");
         return result;
     }
 
@@ -297,7 +290,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         OFRpcTask<UpdateMeterInput, RpcResult<UpdateMeterOutput>> task =
                 OFRpcTaskFactory.createUpdateMeterTask(rpcTaskContext, input, cookie);
         ListenableFuture<RpcResult<UpdateMeterOutput>> result = task.submit();
-        incrementSwitchOFMessageCounters("updateMeter");
         return result;
     }
 
@@ -316,7 +308,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         OFRpcTask<GetAllGroupStatisticsInput, RpcResult<GetAllGroupStatisticsOutput>> task =
                 OFRpcTaskFactory.createGetAllGroupStatisticsTask(rpcTaskContext, input, cookie);
         ListenableFuture<RpcResult<GetAllGroupStatisticsOutput>> result = task.submit();
-        incrementSwitchOFMessageCounters("getAllGroupStatistics");
         return result;
 
     }
@@ -327,7 +318,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetGroupDescriptionInput, RpcResult<GetGroupDescriptionOutput>> task =
                 OFRpcTaskFactory.createGetGroupDescriptionTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getGroupDescription");
         return task.submit();
     }
 
@@ -337,7 +327,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetGroupFeaturesInput, RpcResult<GetGroupFeaturesOutput>> task =
                 OFRpcTaskFactory.createGetGroupFeaturesTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getGroupFeatures");
         return task.submit();
     }
 
@@ -347,7 +336,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetGroupStatisticsInput, RpcResult<GetGroupStatisticsOutput>> task =
                 OFRpcTaskFactory.createGetGroupStatisticsTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getGroupStatistics");
         return task.submit();
     }
 
@@ -358,7 +346,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetAllMeterConfigStatisticsInput, RpcResult<GetAllMeterConfigStatisticsOutput>> task =
                 OFRpcTaskFactory.createGetAllMeterConfigStatisticsTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getAllMeterConfigStatistics");
         return task.submit();
     }
 
@@ -369,7 +356,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetAllMeterStatisticsInput, RpcResult<GetAllMeterStatisticsOutput>> task =
                 OFRpcTaskFactory.createGetAllMeterStatisticsTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getAllMeterStatistics");
         return task.submit();
     }
 
@@ -380,7 +366,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetMeterFeaturesInput, RpcResult<GetMeterFeaturesOutput>> task =
                 OFRpcTaskFactory.createGetMeterFeaturesTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getMeterFeatures");
         return task.submit();
     }
 
@@ -391,7 +376,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetMeterStatisticsInput, RpcResult<GetMeterStatisticsOutput>> task =
                 OFRpcTaskFactory.createGetMeterStatisticsTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getMeterStatistics");
         return task.submit();
     }
 
@@ -402,7 +386,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetAllNodeConnectorsStatisticsInput, RpcResult<GetAllNodeConnectorsStatisticsOutput>> task =
                 OFRpcTaskFactory.createGetAllNodeConnectorsStatisticsTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getAllNodeConnectorsStatistics");
         return task.submit();
     }
 
@@ -413,7 +396,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetNodeConnectorStatisticsInput, RpcResult<GetNodeConnectorStatisticsOutput>> task =
                 OFRpcTaskFactory.createGetNodeConnectorStatisticsTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getNodeConnectorStatistics");
         return task.submit();
     }
 
@@ -423,7 +405,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<UpdatePortInput, RpcResult<UpdatePortOutput>> task =
                 OFRpcTaskFactory.createUpdatePortTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("updatePort");
         return task.submit();
     }
 
@@ -433,7 +414,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<UpdateTableInput, RpcResult<UpdateTableOutput>> task =
                 OFRpcTaskFactory.createUpdateTableTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("updateTable");
         return task.submit();
     }
 
@@ -444,7 +424,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetAllFlowStatisticsFromFlowTableInput, RpcResult<GetAllFlowStatisticsFromFlowTableOutput>> task =
                 OFRpcTaskFactory.createGetAllFlowStatisticsFromFlowTableTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getAllFlowStatisticsFromFlowTable");
         return task.submit();
     }
 
@@ -455,7 +434,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetAllFlowsStatisticsFromAllFlowTablesInput, RpcResult<GetAllFlowsStatisticsFromAllFlowTablesOutput>> task =
                 OFRpcTaskFactory.createGetAllFlowsStatisticsFromAllFlowTablesTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getAllFlowsStatisticsFromAllFlowTables");
         return task.submit();
     }
 
@@ -466,7 +444,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetFlowStatisticsFromFlowTableInput, RpcResult<GetFlowStatisticsFromFlowTableOutput>> task =
                 OFRpcTaskFactory.createGetFlowStatisticsFromFlowTableTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getFlowStatisticsFromFlowTable");
         return task.submit();
     }
 
@@ -477,7 +454,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetAggregateFlowStatisticsFromFlowTableForAllFlowsInput, RpcResult<GetAggregateFlowStatisticsFromFlowTableForAllFlowsOutput>> task =
                 OFRpcTaskFactory.createGetAggregateFlowStatisticsFromFlowTableForAllFlowsTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getAggregateFlowStatisticsFromFlowTableForAllFlows");
         return task.submit();
     }
 
@@ -488,7 +464,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetAggregateFlowStatisticsFromFlowTableForGivenMatchInput, RpcResult<GetAggregateFlowStatisticsFromFlowTableForGivenMatchOutput>> task =
                 OFRpcTaskFactory.createGetAggregateFlowStatisticsFromFlowTableForGivenMatchTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getAggregateFlowStatisticsFromFlowTableForGivenMatch");
         return task.submit();
     }
 
@@ -499,7 +474,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetFlowTablesStatisticsInput, RpcResult<GetFlowTablesStatisticsOutput>> task =
                 OFRpcTaskFactory.createGetFlowTablesStatisticsTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getFlowTablesStatistics");
         return task.submit();
     }
 
@@ -510,7 +484,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetAllQueuesStatisticsFromAllPortsInput, RpcResult<GetAllQueuesStatisticsFromAllPortsOutput>> task =
                 OFRpcTaskFactory.createGetAllQueuesStatisticsFromAllPortsTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getAllQueuesStatisticsFromAllPorts");
         return task.submit();
     }
 
@@ -521,7 +494,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetAllQueuesStatisticsFromGivenPortInput, RpcResult<GetAllQueuesStatisticsFromGivenPortOutput>> task =
                 OFRpcTaskFactory.createGetAllQueuesStatisticsFromGivenPortTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getAllQueuesStatisticsFromGivenPort");
         return task.submit();
     }
 
@@ -532,16 +504,16 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         OFRpcTask<GetQueueStatisticsFromGivenPortInput, RpcResult<GetQueueStatisticsFromGivenPortOutput>> task =
                 OFRpcTaskFactory.createGetQueueStatisticsFromGivenPortTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("getQueueStatisticsFromGivenPort");
         return task.submit();
     }
 
     @Override
     public Future<RpcResult<SetConfigOutput>> setConfig(SetConfigInput input) {
         OFRpcTask<SetConfigInput, RpcResult<SetConfigOutput>> task = OFRpcTaskFactory.createSetNodeConfigTask(rpcTaskContext, input, null);
-        incrementSwitchOFMessageCounters("setConfig");
         return task.submit();
     }
+    
+    
     @Override
     public Optional<BigInteger> sendEmptyTableFeatureRequest() {
         LOG.debug("Send table feature request to {}",nodeId);
@@ -580,6 +552,7 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
     /*
      * Send an OFPMP_DESC request message to the switch
      */
+    
     private void requestDesc() {
         MultipartRequestInputBuilder builder = new MultipartRequestInputBuilder();
         builder.setType(MultipartType.OFPMPDESC);
@@ -608,9 +581,6 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
         try{
             LOG.info("OF Node stats initialization...");
             InstanceIdentifier<OfStatistics> NODEOFSTATS_IID = InstanceIdentifier.builder(OfStatistics.class).build();
-
-            List<String> l = new ArrayList<String>();
-            l.add("0");
             OfStatistics nodeOFStatistics = new OfStatisticsBuilder()
             		.setOfNode(new ArrayList<OfNode>())
             		.build();
@@ -627,100 +597,105 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
 
     private void incrementSwitchOFMessageCounters(final String msgType) {
-        if(sessionContext.getRoleOnDevice().equals(ControllerRole.OFPCRROLEMASTER)){
-        	boolean found = false;
-        	Counter odlCounter = null, newCounter = null;
-    		for(Counter c : ofNodeStats.getCounter()){
-    			if(c.getMsgType().equals(msgType)){
-    				found=true;
-    				odlCounter = c;
-    				if(System.currentTimeMillis()-c.getCounterFirstPacketTs().longValue()>onNodeStatsSlotDuration){
-    					//timeout, update last counter, initialize new count
-    					newCounter = new CounterBuilder()
-    							.setMsgType(c.getMsgType())
-    							.setCounterCount(BigInteger.ONE)
-    							.setCounterFirstPacketTs(BigInteger.valueOf(System.currentTimeMillis()))
-    							.setLastCounterCount(c.getCounterCount())
-    							.setLastCounterFirstPacketTs(c.getCounterFirstPacketTs())
-    							.build();
-    				}
-    				else{
-    					//update counter
-    					newCounter = new CounterBuilder()
-    							.setMsgType(c.getMsgType())
-    							.setCounterCount(c.getCounterCount().add(BigInteger.ONE))
-    							.setCounterFirstPacketTs(c.getCounterFirstPacketTs())
-    							.build();
-    				}
-    			}
-    		}
-    		if(!found){
-    			newCounter = new CounterBuilder()
-    					.setMsgType(msgType)
-    					.setCounterCount(BigInteger.ONE)
-    					.setCounterFirstPacketTs(BigInteger.valueOf(System.currentTimeMillis()))
-    					.build();
-    		}
-    		ofNodeStats.getCounter().remove(odlCounter);
-    		ofNodeStats.getCounter().add(newCounter);
+       	boolean found = false;
+       	Counter odlCounter = null, newCounter = null;
+   		for(Counter c : ofNodeStats.getCounter()){
+   			if(c.getMsgType().equals(msgType)){
+   				found=true;
+   				odlCounter = c;
+   				long offset = System.currentTimeMillis()-c.getCounterFirstPacketTs().longValue();
+   				if(offset>onNodeStatsSlotDuration){
+   					//timeout, update last counter, initialize new count
+   					newCounter = new CounterBuilder()
+   							.setMsgType(c.getMsgType())
+   							.setCounterCount(BigInteger.ONE)	
+   							.setLastCounterCount(c.getCounterCount())
+   							.setCounterFirstPacketTs(BigInteger.valueOf(System.currentTimeMillis()))
+   							.setLastCounterFirstPacketTs(c.getCounterFirstPacketTs())
+   							.build();
+   				}
+   				else{
+   					//update counter
+   					newCounter = new CounterBuilder()
+   							.setMsgType(c.getMsgType())
+   							.setCounterCount(c.getCounterCount().add(BigInteger.ONE))
+   							.setLastCounterCount(c.getLastCounterCount())
+   							.setCounterFirstPacketTs(c.getCounterFirstPacketTs())
+   							.setLastCounterFirstPacketTs(c.getLastCounterFirstPacketTs())
+   							.build();
+   				}
+   			}
+   		}
+   		if(!found){
+   			newCounter = new CounterBuilder()
+   					.setMsgType(msgType)
+   					.setCounterCount(BigInteger.ONE)
+   					.setCounterFirstPacketTs(BigInteger.valueOf(System.currentTimeMillis()))
+   					.build();
+   		}
+   		ofNodeStats.getCounter().remove(odlCounter);
+   		ofNodeStats.getCounter().add(newCounter);
 
-    		long offset = System.currentTimeMillis()-lastWriteInDatastoreTimestamp;
-    		if(offset > onNodeStatsWriteInDatastoreTimeout){
-    			lastWriteInDatastoreTimestamp = System.currentTimeMillis();
-    			writeOFStatsUpdateInDataStore();
-    		    }
-        }
+   		long offset = System.currentTimeMillis()-lastWriteInDatastoreTimestamp;
+    	if(offset > onNodeStatsWriteInDatastoreTimeout){
+    		lastWriteInDatastoreTimestamp = System.currentTimeMillis();
+    		writeOFStatsUpdateInDataStore();
+    	    }
     }
 
 
 
-	private void writeOFStatsUpdateInDataStore() {
-		final DataBroker dataBroker = OFSessionUtil.getSessionManager().getDataBroker();
-		try{
-		    LOG.info("Writing OF nodes stats to Datastore...");
-		    final InstanceIdentifier<OfStatistics> NODEOFSTATS_IID = InstanceIdentifier.builder(OfStatistics.class).build();
-		    ReadOnlyTransaction readTx = dataBroker.newReadOnlyTransaction();
-		    ListenableFuture<Optional<OfStatistics>> dataFuture = readTx.read(LogicalDatastoreType.OPERATIONAL, NODEOFSTATS_IID);
-		    Futures.addCallback(dataFuture, new FutureCallback<Optional<OfStatistics>>() {
-		    	@Override
-		        public void onSuccess(final Optional<OfStatistics> result) {
-		            if(result.isPresent()) {
-		            	OfStatistics ofs = result.get();
-		            	OfNode ofn = cointains(ofs.getOfNode(), getNodeId());
-		            	if(ofn==null){
-		            		LOG.info("DataStore doesn't cointains an entry for node "+getNodeId().getValue()+", creating");
-		            		ofs.getOfNode().add(ofNodeStats);
-		            	}
-		            	else{
-		            		LOG.info("DataStore already cointains an entry for node "+getNodeId().getValue()+", updating");
-		            		ofs.getOfNode().remove(ofn);
-		            		ofs.getOfNode().add(ofNodeStats);
-		            	}
-		            	WriteTransaction wtx = dataBroker.newWriteOnlyTransaction();
-		                wtx.merge(LogicalDatastoreType.OPERATIONAL, NODEOFSTATS_IID, ofs, true);
-		                wtx.submit();
-		                LOG.info("Writing changes to DataStore for node "+getNodeId().getValue());
-		            }
-		            else {
-		            	LOG.info("OF Node stats not properly initialized");
-		            }
-		        }
-				@Override
-		        public void onFailure(final Throwable t) {
-		        	LOG.info("OF Node stats, read from datastore failed");
-		        }
-		    });
-		}
-		catch(Exception e){
-		    LOG.error(e.getMessage());
-		}
+	private void writeOFStatsUpdateInDataStore() { 
+	    //collecting of node stats only if I'm its master controller
+	    if(RoleUtil.readRoleFromDevice(sessionContext).equals(ControllerRole.OFPCRROLEMASTER)){
+	        LOG.info("Writing of node stats for "+getNodeId().getValue()+" because I'm the Master controller");
+    		final DataBroker dataBroker = OFSessionUtil.getSessionManager().getDataBroker();
+    		try{
+    		    LOG.info("Writing OF nodes stats to Datastore...");
+    		    final InstanceIdentifier<OfStatistics> NODEOFSTATS_IID = InstanceIdentifier.builder(OfStatistics.class).build();
+    		    ReadOnlyTransaction readTx = dataBroker.newReadOnlyTransaction();
+    		    ListenableFuture<Optional<OfStatistics>> dataFuture = readTx.read(LogicalDatastoreType.OPERATIONAL, NODEOFSTATS_IID);
+    		    Futures.addCallback(dataFuture, new FutureCallback<Optional<OfStatistics>>() {
+    		    	@Override
+    		        public void onSuccess(final Optional<OfStatistics> result) {
+    		            if(result.isPresent()) {
+    		            	OfStatistics ofs = result.get();
+    		            	OfNode ofn = cointains(ofs.getOfNode(), getNodeId());
+    		            	if(ofn==null){
+    		            		LOG.info("DataStore doesn't cointains an entry for node "+getNodeId().getValue()+", creating");
+    		            		ofs.getOfNode().add(ofNodeStats);
+    		            	}
+    		            	else{
+    		            		LOG.info("DataStore already cointains an entry for node "+getNodeId().getValue()+", updating");
+    		            		ofs.getOfNode().remove(ofn);
+    		            		ofs.getOfNode().add(ofNodeStats);
+    		            	}
+    		            	WriteTransaction wtx = dataBroker.newWriteOnlyTransaction();
+    		                wtx.merge(LogicalDatastoreType.OPERATIONAL, NODEOFSTATS_IID, ofs, true);
+    		                wtx.submit();
+    		                LOG.info("Writing changes to DataStore for node "+getNodeId().getValue());
+    		            }
+    		            else {
+    		            	LOG.info("OF Node stats not properly initialized");
+    		            }
+    		        }
+    				@Override
+    		        public void onFailure(final Throwable t) {
+    		        	LOG.info("OF Node stats, read from datastore failed");
+    		        }
+    		    });
+    		}
+    		catch(Exception e){
+    		    LOG.error(e.getMessage());
+    		}
+	    }
 	}
 
 
 
     private OfNode cointains(List<OfNode>  ofNodes, NodeId nodeId) {
 		for(OfNode n : ofNodes)
-			if(n.getNodeId().equals(nodeId.getValue()))
+			if(n.getNodeId().equals(nodeId.getValue().split(":")[1]))
 				return n;
 
 		return null;
