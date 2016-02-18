@@ -576,25 +576,44 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
     }
 
 
+    
+    
     private void initializeOFStatsPerSwitch() {
-        DataBroker dataBroker = OFSessionUtil.getSessionManager().getDataBroker();
-        try{
-            LOG.info("OF Node stats initialization...");
-            InstanceIdentifier<OfStatistics> NODEOFSTATS_IID = InstanceIdentifier.builder(OfStatistics.class).build();
-            OfStatistics nodeOFStatistics = new OfStatisticsBuilder()
-            		.setOfNode(new ArrayList<OfNode>())
-            		.build();
-            WriteTransaction wtx = dataBroker.newWriteOnlyTransaction();
-            wtx.merge(LogicalDatastoreType.OPERATIONAL, NODEOFSTATS_IID, nodeOFStatistics, true);
-            wtx.submit();
-            LOG.info("OF Node stats initialization success!!");
-        }
-        catch(Exception e){
-            LOG.error(e.getMessage());
-        }
+        final DataBroker dataBroker = OFSessionUtil.getSessionManager().getDataBroker();
+        final InstanceIdentifier<OfStatistics> NODEOFSTATS_IID = InstanceIdentifier.builder(OfStatistics.class).build();
+        
+        //if already initialized by another cluster's controller, update it
+        ReadOnlyTransaction readTx = dataBroker.newReadOnlyTransaction();
+        ListenableFuture<Optional<OfStatistics>> dataFuture = readTx.read(LogicalDatastoreType.OPERATIONAL, NODEOFSTATS_IID);
+        Futures.addCallback(dataFuture, new FutureCallback<Optional<OfStatistics>>() {
+            @Override
+            public void onSuccess(final Optional<OfStatistics> result) {
+                if(result.isPresent()) {
+                    OfStatistics ofs = result.get();
+                    OfNode ofn = cointains(ofs.getOfNode(), getNodeId());
+                    if(ofn!=null)
+                        ofNodeStats=ofn;
+                }
+                else{
+                    LOG.info("OF Node stats initialization...");
+                    OfStatistics nodeOFStatistics = new OfStatisticsBuilder()
+                            .setOfNode(new ArrayList<OfNode>())
+                            .build();
+                    WriteTransaction wtx = dataBroker.newWriteOnlyTransaction();
+                    wtx.merge(LogicalDatastoreType.OPERATIONAL, NODEOFSTATS_IID, nodeOFStatistics, true);
+                    wtx.submit();
+                    LOG.info("OF Node stats initialization success!!");
+                }
+            }
+            @Override
+            public void onFailure(final Throwable t) {
+            }
+        });
     }
 
 
+    
+    
 
     private void incrementSwitchOFMessageCounters(final String msgType) {
        	boolean found = false;
