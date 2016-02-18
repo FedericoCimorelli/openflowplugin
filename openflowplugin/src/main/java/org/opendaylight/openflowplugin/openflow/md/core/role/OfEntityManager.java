@@ -41,6 +41,9 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.FutureCallback;
+
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.CheckedFuture;
@@ -467,7 +470,12 @@ public class OfEntityManager implements TransactionChainListener{
 
     public void callOnDeviceOwnershipChanged(SessionContext context, ControllerRole controllerRole){
         LOG.info("callOnDeviceOwnershipChanged(SessionContext context, ControllerRole controllerRole)");
-        for(Entity entity : entsession.keySet()){
+        
+        //Prevent cross-compile exception when compiled on higher java version
+        //used only for the .getKeySet()
+        Map<Entity, MDSwitchMetaData> es = new ConcurrentHashMap<>(entsession);
+        
+        for(Entity entity : es.keySet()){
             if(entsession.get(entity).getContext().getFeatures().getDatapathId().toString()
                     .equals(context.getFeatures().getDatapathId().toString())){
                 //new EntityOwnershipChange(entity, wasOwner, isOwner, hasOwner)
