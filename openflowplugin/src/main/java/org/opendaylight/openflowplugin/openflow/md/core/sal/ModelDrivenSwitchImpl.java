@@ -8,19 +8,12 @@
 package org.opendaylight.openflowplugin.openflow.md.core.sal;
 
 import com.google.common.base.Optional;
-import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
-import org.opendaylight.controller.md.sal.binding.api.DataBroker;
-import org.opendaylight.controller.md.sal.binding.api.ReadOnlyTransaction;
 import org.opendaylight.controller.md.sal.binding.api.ReadWriteTransaction;
-import org.opendaylight.controller.md.sal.binding.api.WriteTransaction;
-import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
-
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.opendaylight.controller.sal.binding.api.NotificationProviderService;
@@ -31,9 +24,8 @@ import org.opendaylight.openflowplugin.api.openflow.md.core.session.IMessageDisp
 import org.opendaylight.openflowplugin.openflow.md.core.session.OFSessionUtil;
 import org.opendaylight.openflowplugin.api.openflow.md.core.session.SessionContext;
 import org.opendaylight.openflowplugin.openflow.md.core.session.SwitchConnectionCookieOFImpl;
-import org.opendaylight.openflowplugin.openflow.md.util.RoleUtil;
-import org.opendaylight.openflowplugin.statistics.ONNodesStatisticsManager;
-import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.yang.types.rev100924.Timestamp;
+import org.opendaylight.openflowplugin.statistics.OFNodeStatsCounters;
+import org.opendaylight.openflowplugin.statistics.StatisticsTempData;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.AddFlowInput;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.AddFlowOutput;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.RemoveFlowInput;
@@ -84,13 +76,9 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.meter.statistics.rev131111.
 import org.opendaylight.yang.gen.v1.urn.opendaylight.meter.statistics.rev131111.GetMeterStatisticsOutput;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.module.config.rev141015.SetConfigInput;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.module.config.rev141015.SetConfigOutput;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.nodes.statistics.rev160114.OfStatistics;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.nodes.statistics.rev160114.OfStatisticsBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.nodes.statistics.rev160114.ofstatistics.OfNode;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.nodes.statistics.rev160114.ofstatistics.OfNodeBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.nodes.statistics.rev160114.ofstatistics.ofnode.Counter;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.nodes.statistics.rev160114.ofstatistics.ofnode.CounterBuilder;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.common.types.rev130731.ControllerRole;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.common.types.rev130731.MultipartRequestFlags;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.common.types.rev130731.MultipartType;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.openflow.protocol.rev130731.MultipartRequestInputBuilder;
@@ -160,7 +148,7 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
         ofNodeStats = new OfNodeBuilder().setNodeId(nodeId.getValue().split(":")[1]).setCounter(new ArrayList<Counter>()).build();
         lastWriteInDatastoreTimestamp = 0L;
-        initializeOFStatsPerSwitch();
+        //initializeOFStatsPerSwitch();
     }
 
     @Override
@@ -578,7 +566,7 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
 
     
     
-    private void initializeOFStatsPerSwitch() {
+/*    private void initializeOFStatsPerSwitch() {
         final DataBroker dataBroker = OFSessionUtil.getSessionManager().getDataBroker();
         final InstanceIdentifier<OfStatistics> NODEOFSTATS_IID = InstanceIdentifier.builder(OfStatistics.class).build();
         
@@ -609,14 +597,22 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
             public void onFailure(final Throwable t) {
             }
         });
-    }
+    }*/
 
 
     
     
 
     private void incrementSwitchOFMessageCounters(final String msgType) {
-       	boolean found = false;
+        if(!StatisticsTempData.OFNodesStatsCounters.keySet().contains(nodeId.getValue().split(":")[1])){
+            OFNodeStatsCounters onc = new OFNodeStatsCounters();
+            onc.incrementCounterSend();
+            StatisticsTempData.OFNodesStatsCounters.put(nodeId.getValue().split(":")[1], onc);
+        }
+        else{
+            StatisticsTempData.OFNodesStatsCounters.get(nodeId.getValue().split(":")[1]).incrementCounterSend();
+        }
+        /*       	boolean found = false;
        	Counter odlCounter = null, newCounter = null;
    		for(Counter c : ofNodeStats.getCounter()){
    			if(c.getMsgType().equals(msgType)){
@@ -659,12 +655,12 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
     	if(offset > onNodeStatsWriteInDatastoreTimeout){
     		lastWriteInDatastoreTimestamp = System.currentTimeMillis();
     		writeOFStatsUpdateInDataStore();
-    	    }
+    	    }*/
     }
 
 
 
-	private void writeOFStatsUpdateInDataStore() { 
+/*	private void writeOFStatsUpdateInDataStore() { 
 	    //collecting of node stats only if I'm its master controller
 	    if(RoleUtil.readRoleFromDevice(sessionContext).equals(ControllerRole.OFPCRROLEMASTER)){
 	        LOG.info("Writing of node stats for "+getNodeId().getValue()+" because I'm the Master controller");
@@ -708,16 +704,16 @@ public class ModelDrivenSwitchImpl extends AbstractModelDrivenSwitch {
     		    LOG.error(e.getMessage());
     		}
 	    }
-	}
+	}*/
 
 
 
-    private OfNode cointains(List<OfNode>  ofNodes, NodeId nodeId) {
+/*    private OfNode cointains(List<OfNode>  ofNodes, NodeId nodeId) {
 		for(OfNode n : ofNodes)
 			if(n.getNodeId().equals(nodeId.getValue().split(":")[1]))
 				return n;
 
 		return null;
-	}
+	}*/
 
 }
